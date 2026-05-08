@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🤖 AI Agent Skill Tree — 技能樹視覺化</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0a1a;--surface:#12122a;--border:#2a2a4a;
+    --text:#e0e0f0;--text-dim:#8888aa;
+    --accent:#6c63ff;
+  }
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'Segoe UI','Noto Sans TC',sans-serif;
+    overflow:hidden;height:100vh;width:100vw;
+    display:flex;flex-direction:column;
+  }
+  #header{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    background:linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 100%);
+    border-bottom:1px solid var(--border);
+    padding:12px 20px;display:flex;align-items:center;gap:16px;
+    backdrop-filter:blur(10px);
+  }
+  #header h1{
+    font-size:18px;font-weight:700;
+    background:linear-gradient(135deg,#6c63ff,#ff6b9d);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    white-space:nowrap;
+  }
+  #header .subtitle{font-size:12px;color:var(--text-dim);margin-left:4px}
+  #search-box{
+    margin-left:auto;position:relative;
+  }
+  #search-box input{
+    background:rgba(255,255,255,0.06);border:1px solid var(--border);
+    border-radius:8px;padding:8px 14px 8px 36px;
+    color:var(--text);font-size:13px;width:240px;outline:none;
+    transition:all .3s;
+  }
+  #search-box input:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(108,99,255,.15);
+    width:300px;
+  }
+  #search-box::before{
+    content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);
+    font-size:14px;pointer-events:none;
+  }
+  #legend{
+    position:fixed;top:60px;right:16px;z-index:100;
+    background:rgba(18,18,42,.92);border:1px solid var(--border);
+    border-radius:12px;padding:14px 16px;
+    backdrop-filter:blur(10px);max-height:70vh;overflow-y:auto;
+    transition:opacity .3s;
+  }
+  #legend h3{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-dim)}
+  .legend-item{
+    display:flex;align-items:center;gap:8px;
+    padding:3px 0;font-size:12px;cursor:pointer;
+    transition:opacity .2s;
+  }
+  .legend-item:hover{opacity:.8}
+  .legend-item.dimmed{opacity:.3}
+  .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .legend-count{color:var(--text-dim);margin-left:auto;font-size:11px}
+  #canvas-wrap{
+    flex:1;position:relative;
+    background:radial-gradient(ellipse at center,#0f0f2a 0%,#0a0a1a 70%);
+  }
+  canvas{display:block;width:100%;height:100%}
+  #tooltip{
+    position:fixed;z-index:200;pointer-events:none;
+    background:rgba(18,18,42,.95);border:1px solid var(--border);
+    border-radius:10px;padding:12px 16px;
+    backdrop-filter:blur(12px);max-width:320px;
+    opacity:0;transition:opacity .15s;font-size:13px;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);
+  }
+  #tooltip.visible{opacity:1}
+  #tooltip .tt-name{font-weight:700;font-size:14px;margin-bottom:4px}
+  #tooltip .tt-cat{font-size:11px;color:var(--text-dim);margin-bottom:6px}
+  #tooltip .tt-desc{line-height:1.5;color:var(--text-dim)}
+  #info{
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    z-index:100;font-size:11px;color:var(--text-dim);
+    text-align:center;pointer-events:none;
+    background:rgba(18,18,42,.8);padding:6px 16px;border-radius:20px;
+  }
+  #stats{
+    position:fixed;top:60px;left:16px;z-index:100;
+    background:rgba(18,18,42,.92);border:1px solid var(--border);
+    border-radius:12px;padding:14px 16px;backdrop-filter:blur(10px);
+  }
+  #stats .stat-row{font-size:12px;margin:3px 0;display:flex;justify-content:space-between;gap:16px}
+  #stats .stat-val{color:var(--accent);font-weight:700}
+  #zoom-controls{
+    position:fixed;bottom:16px;right:16px;z-index:100;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  #zoom-controls button{
+    width:36px;height:36px;border-radius:8px;
+    background:rgba(18,18,42,.9);border:1px solid var(--border);
+    color:var(--text);font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .2s;
+  }
+  #zoom-controls button:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🤖 AI Agent Skill Tree</h1>
+  <span class="subtitle">互動式技能探索圖譜</span>
+  <div id="search-box">
+    <input type="text" id="search-input" placeholder="搜尋技能或工具..." />
+  </div>
+</div>
+
+<div id="stats">
+  <div class="stat-row"><span>總技能數</span><span class="stat-val" id="s-total">0</span></div>
+  <div class="stat-row"><span>分類數</span><span class="stat-val" id="s-cats">0</span></div>
+  <div class="stat-row"><span>已選擇</span><span class="stat-val" id="s-selected">—</span></div>
+</div>
+
+<div id="legend"><h3>📂 分類</h3></div>
+<div id="tooltip"></div>
+<div id="canvas-wrap"><canvas id="c"></canvas></div>
+
+<div id="info">🖱 滾輪縮放 · 拖曳平移 · 點擊節點展開 · 懸停查看詳情</div>
+
+<div id="zoom-controls">
+  <button id="zm-in" title="放大">+</button>
+  <button id="zm-out" title="縮小">−</button>
+  <button id="zm-reset" title="重置">⟲</button>
+</div>
+
+<script>
+// ==================== DATA ====================
+const CATEGORIES = {
+  creative:     { label:'🎨 Creative',       color:'#ff6b9d', icon:'🎨' },
+  devops:       { label:'🔧 DevOps',         color:'#ffa642', icon:'🔧' },
+  gaming:       { label:'🎮 Gaming',         color:'#4ecdc4', icon:'🎮' },
+  github:       { label:'🐙 GitHub',         color:'#7c83ff', icon:'🐙' },
+  coder:        { label:'💻 Creative Dev',   color:'#a29bfe', icon:'💻' },
+  mlops:        { label:'🤖 MLOps',          color:'#00cec9', icon:'🤖' },
+  mcp:          { label:'🔌 MCP',            color:'#fdcb6e', icon:'🔌' },
+  research:     { label:'🔬 Research',       color:'#e17055', icon:'🔬' },
+  productivity: { label:'📊 Productivity',   color:'#6c5ce7', icon:'📊' },
+  social:       { label:'📱 Social/Media',   color:'#fd79a8', icon:'📱' },
+  trend:        { label:'📈 Trend Hunting',  color:'#00b894', icon:'📈' },
+  smarthome:    { label:'🏠 Smart Home',     color:'#55a3e7', icon:'🏠' },
+  dogfood:      { label:'🐕 QA/Dogfood',    color:'#b2bec3', icon:'🐕' },
+  notes:        { label:'📝 Note-taking',    color:'#dfe6e9', icon:'📝' },
+  email:        { label:'📧 Email',          color:'#e77f6f', icon:'📧' },
+  spiritual:    { label:'🧘 Spiritual',      color:'#a8e6cf', icon:'🧘' },
+};
+
+const SKILLS = [
+  // Creative
+  { id:'ascii-art', cat:'creative', desc:'ASCII 藝術生成：pyfiglet, cowsay, boxes, 圖片轉 ASCII' },
+  { id:'pixel-art', cat:'creative', desc:'像素藝術創作：NES, Game Boy, PICO-8 等經典配色' },
+  { id:'excalidraw', cat:'creative', desc:'手繪風格 Excalidraw JSON 圖表生成' },
+  { id:'manim-video', cat:'creative', desc:'Manim CE 動畫：3Blue1Brown 風格數學/演算法影片' },
+  { id:'comfyui', cat:'creative', desc:'AI 影像生成：ComfyUI 工作流, 圖片/影片/音訊生成' },
+  { id:'artistic', cat:'creative', desc:'創意藝術：pyfiglet 字體, ASCII 動畫, 圖片處理' },
+  // DevOps
+  { id:'kanban-orch', cat:'devops', desc:'Kanban 任務分解 + 專家角色分配 + 工作流協調' },
+  { id:'kanban-worker', cat:'devops', desc:'Kanban 專家模式：pitfalls, 範例, 邊緣情況處理' },
+  { id:'webhook-subs', cat:'devops', desc:'Webhook 訂閱：事件驅動 Agent 執行' },
+  { id:'install-skills', cat:'devops', desc:'自動安裝 AI 設計技能：搜尋、下載、部署' },
+  // Gaming
+  { id:'mc-server', cat:'gaming', desc:'模組 Minecraft 伺服器：CurseForge, Modrinth' },
+  { id:'pokemon', cat:'gaming', desc:'透過無頭模擬器 + RAM 讀取玩 Pokemon' },
+  // GitHub
+  { id:'gh-auth', cat:'github', desc:'GitHub 認證：HTTPS tokens, SSH keys, gh CLI' },
+  { id:'gh-review', cat:'github', desc:'PR 程式碼審查：diff, 行級評論, gh CLI' },
+  { id:'gh-issues', cat:'github', desc:'GitHub Issue 管理：建立、分類、標籤、指派' },
+  { id:'gh-pr', cat:'github', desc:'PR 生命週期：branch, commit, CI, merge' },
+  { id:'gh-repo', cat:'github', desc:'Repo 管理：clone/fork, remotes, releases' },
+  // Creative Dev
+  { id:'creative-dev', cat:'coder', desc:'自主創意開發：搜尋趨勢 → 建立可視化工具' },
+  // MLOps
+  { id:'hf-hub', cat:'mlops', desc:'HuggingFace CLI：搜尋/下載/上傳模型、数据集' },
+  { id:'vllm', cat:'mlops', desc:'vLLM 高吞吐量 LLM 服務：OpenAI API, 量化' },
+  { id:'llama-cpp', cat:'mlops', desc:'llama.cpp 本地 GGUF 推理 + HF Hub 模型發現' },
+  { id:'outlines', cat:'mlops', desc:'結構化輸出：JSON/regex/Pydantic LLM 生成' },
+  { id:'dspy', cat:'mlops', desc:'DSPy 宣言式 LM 程式：自動最佳化 prompt, RAG' },
+  { id:'axolotl', cat:'mlops', desc:'Axolotl YAML LLM 微調：LoRA, DPO, GRPO' },
+  { id:'unsloth', cat:'mlops', desc:'Unsloth 2-5x 加速 LoRA/QLoRA 微調, 低 VRAM' },
+  { id:'trl', cat:'mlops', desc:'TRL SFT/DPO/PPO/GRPO, reward modeling' },
+  { id:'eval-harness', cat:'mlops', desc:'lm-eval-harness 基準測試：MMLU, GSM8K 等' },
+  { id:'wandb', cat:'mlops', desc:'W&B 實驗追蹤：log sweeps, 模型註冊, dashboards' },
+  // MCP
+  { id:'native-mcp', cat:'mcp', desc:'MCP 客戶端：連接 servers, 註冊 tools' },
+  // Research
+  { id:'arxiv', cat:'research', desc:'arXiv 論文搜尋：關鍵字、作者、類別、ID' },
+  { id:'blogwatcher', cat:'research', desc:'部落格監測：RSS/Atom feeds 訂閱' },
+  { id:'polymarket', cat:'research', desc:'Polymarket 預測市場：價格、訂單簿、歷史' },
+  { id:'llm-wiki', cat:'research', desc:'Karpathy LLM Wiki：連結式 markdown 知識庫' },
+  // Productivity
+  { id:'gworkspace', cat:'productivity', desc:'Google Workspace：Gmail, Calendar, Drive, Docs, Sheets' },
+  { id:'notion', cat:'productivity', desc:'Notion API：pages, databases, blocks, search' },
+  { id:'airtable', cat:'productivity', desc:'Airtable REST API：records CRUD, filters, upserts' },
+  { id:'linear', cat:'productivity', desc:'Linear 管理：issues, projects, teams via GraphQL' },
+  { id:'powerpoint', cat:'productivity', desc:'PPTX 簡報：建立、編輯、模板、講者備忘' },
+  // Social/Media
+  { id:'xurl', cat:'social', desc:'X/Twitter CLI：發文、搜尋、DM、媒體、v2 API' },
+  { id:'yt-content', cat:'social', desc:'YouTube 轉錄：摘要、thread、博客文章' },
+  { id:'spotify', cat:'social', desc:'Spotify：播放、搜尋、播放列表、設備管理' },
+  { id:'gif-search', cat:'social', desc:'Tenor GIF 搜尋/下載' },
+  { id:'heartmula', cat:'social', desc:'HeartMuLa 歌曲生成：類似 Suno 的 AI 音樂' },
+  { id:'songsee', cat:'social', desc:'音訊聲譜圖/特徵：mel, chroma, MFCC' },
+  // Trend
+  { id:'trend-hunt', cat:'trend', desc:'自動搜尋熱門話題、影片、應用, 輸出趨勢報告' },
+  // Smart Home
+  { id:'openhue', cat:'smarthome', desc:'Philips Hue 燈光控制：場景、房間、色溫' },
+  // Dogfood
+  { id:'dogfood', cat:'dogfood', desc:'Web 應用探索性 QA：找 bug、收集證據、產生報告' },
+  // Notes
+  { id:'obsidian', cat:'notes', desc:'Obsidian 筆記：讀取、搜尋、建立、編輯 vault' },
+  // Email
+  { id:'himalaya', cat:'email', desc:'Himalaya CLI：IMAP/SMTP 終端電子郵件' },
+  // Spiritual
+  { id:'spiritual', cat:'spiritual', desc:'心靈成長內容搜尋、學習與分享' },
+];
+
+// ==================== SETUP ====================
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+
+let W, H;
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => { resize(); simulate(); draw(); });
+resize();
+
+// ==================== GRAPH ====================
+const nodes = [];
+const edges = [];
+const catNodes = [];
+const skillNodes = [];
+const catMap = {};
+
+const catColors = {};
+for (const [k, v] of Object.entries(CATEGORIES)) catColors[k] = v.color;
+
+// Root node
+const rootNode = { id:'root', label:'🤖 AI Agent', isRoot:true, radius:30, color:'#6c63ff', x:0, y:0, vx:0, vy:0, fx:0, fy:0 };
+nodes.push(rootNode);
+
+// Category nodes
+for (const [catId, catInfo] of Object.entries(CATEGORIES)) {
+  const cn = { id:catId, label:catInfo.label, catId, isCat:true, radius:18, color:catInfo.color, x:0, y:0, vx:0, vy:0, fx:0, fy:0, desc:catInfo.icon+' '+catId };
+  nodes.push(cn);
+  catNodes.push(cn);
+  catMap[catId] = cn;
+  edges.push({ source:rootNode, target:cn, color:'#444466' });
+}
+
+// Skill nodes
+for (const sk of SKILLS) {
+  const cn = { id:sk.id, label:sk.id.replace(/[-_]/g,' '), catId:sk.cat, isSkill:true, radius:8, color:catColors[sk.cat], x:0, y:0, vx:0, vy:0, fx:0, fy:0, desc:sk.desc, catName:CATEGORIES[sk.cat].label };
+  nodes.push(cn);
+  skillNodes.push(cn);
+  edges.push({ source:catMap[sk.cat], target:cn, color:catColors[sk.cat], opacity:0.3 });
+}
+
+// ==================== FORCE SIMULATION ====================
+const alpha = { value:1, decay:0.992, min:0.001 };
+
+function simulate() {
+  const cx = W / 2;
+  const cy = H / 2;
+  const catR = Math.min(W, H) * 0.22;
+
+  // Init positions
+  rootNode.x = cx; rootNode.y = cy;
+
+  catNodes.forEach((cn, i) => {
+    const angle = (2 * Math.PI * i / catNodes.length) - Math.PI / 2;
+    cn.x = cx + catR * Math.cos(angle);
+    cn.y = cy + catR * Math.sin(angle);
+  });
+
+  skillNodes.forEach(sn => {
+    const catC = catMap[sn.catId];
+    const siblings = skillNodes.filter(s => s.catId === sn.catId);
+    const idx = siblings.indexOf(sn);
+    const angle = Math.atan2(sn.y - catC.y, sn.x - catC.x);
+    const spreadAngle = (2 * Math.PI / siblings.length) * 0.35;
+    const targetAngle = angle + (idx - (siblings.length-1)/2) * spreadAngle;
+    const dist = catR + 80 + Math.random() * 40;
+    sn.x = cx + dist * Math.cos(targetAngle);
+    sn.y = cy + dist * Math.sin(targetAngle);
+  });
+
+  // Run simulation
+  for (let iter = 0; iter < 400; iter++) {
+    alpha.value *= alpha.decay;
+    if (alpha.value < alpha.min) break;
+
+    // Center gravity on root
+    rootNode.vx += (cx - rootNode.x) * 0.01;
+    rootNode.vy += (cy - rootNode.y) * 0.01;
+
+    // Category ring gravity
+    catNodes.forEach(cn => {
+      const dx = cn.x - cx, dy = cn.y - cy;
+      const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+      const force = (dist - catR) * 0.03 * alpha.value;
+      cn.vx -= (dx/dist) * force;
+      cn.vy -= (dy/dist) * force;
+    });
+
+    // Skill gravity to category
+    skillNodes.forEach(sn => {
+      const catC = catMap[sn.catId];
+      const dx = sn.x - catC.x, dy = sn.y - catC.y;
+      const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+      const force = (dist - 100) * 0.02 * alpha.value;
+      sn.vx -= (dx/dist) * force;
+      sn.vy -= (dy/dist) * force;
+    });
+
+    // Repulsion between all nodes
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i+1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        let dist = Math.sqrt(dx*dx+dy*dy) || 1;
+        const minDist = (a.radius + b.radius) * 3;
+        if (dist < minDist) {
+          const force = ((minDist - dist) / minDist) * 2 * alpha.value;
+          a.vx += (dx/dist) * force;
+          a.vy += (dy/dist) * force;
+          b.vx -= (dx/dist) * force;
+          b.vy -= (dy/dist) * force;
+        }
+      }
+    }
+
+    // Apply velocity
+    nodes.forEach(n => {
+      n.vx *= 0.85; n.vy *= 0.85;
+      n.x += n.vx; n.y += n.vy;
+    });
+  }
+}
+
+// ==================== DRAW ====================
+let camX = 0, camY = 0, camScale = 1;
+let selectedNode = null;
+let hoveredNode = null;
+let searchQuery = '';
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(W/2 + camX, H/2 + camY);
+  ctx.scale(camScale, camScale);
+
+  // Draw edges
+  edges.forEach(e => {
+    const s = typeof e.source === 'string' ? nodes.find(n=>n.id===e.source) : e.source;
+    const t = typeof e.target === 'string' ? nodes.find(n=>n.id===e.target) : e.target;
+    if (!s || !t) return;
+    const isMatch = isRelevant(t);
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    // Bezier curve
+    const mx = (s.x + t.x)/2, my = (s.y + t.y)/2;
+    ctx.quadraticCurveTo(mx, my, t.x, t.y);
+    ctx.strokeStyle = isMatch ? e.color : '#1a1a2a';
+    ctx.lineWidth = isMatch ? 1.5 : 0.8;
+    ctx.globalAlpha = isMatch ? 0.6 : 0.15;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const isMatch = isRelevant(n);
+    const isHover = n === hoveredNode;
+    const isSelected = n === selectedNode;
+    const r = isHover ? n.radius * 1.3 : n.radius;
+    const alpha = isMatch ? 1 : 0.15;
+
+    ctx.globalAlpha = alpha;
+
+    // Glow
+    if (isHover || isSelected) {
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3);
+      grad.addColorStop(0, n.color + '40');
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r * 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Node circle
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+    ctx.fillStyle = isSelected ? '#fff' : n.color;
+    ctx.fill();
+    ctx.strokeStyle = isSelected ? '#fff' : n.color + '88';
+    ctx.lineWidth = isSelected ? 2.5 : 1;
+    ctx.stroke();
+
+    // Label for category and root
+    if (n.isRoot || n.isCat) {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${n.isRoot ? 13 : 11}px 'Segoe UI', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.label, n.x, n.y);
+    }
+
+    // Label for skills
+    if (n.isSkill && isMatch) {
+      ctx.fillStyle = '#ccc';
+      ctx.font = `9px 'Segoe UI', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(n.label, n.x, n.y + r + 3);
+    }
+
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.restore();
+}
+
+function isRelevant(n) {
+  if (!searchQuery) return true;
+  if (n === rootNode) return true;
+  const q = searchQuery.toLowerCase();
+  if (n.isCat) {
+    return SKILLS.some(s => s.cat === n.catId && s.id.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q));
+  }
+  return n.label.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q) || n.catName.toLowerCase().includes(q);
+}
+
+// ==================== INTERACTION ====================
+let dragging = null, dragOffX = 0, dragOffY = 0;
+
+function getNodeAt(mx, my) {
+  // Transform mouse to canvas coords
+  const cx = (mx - W/2 - camX) / camScale;
+  const cy = (my - H/2 - camY) / camScale;
+  for (let i = nodes.length-1; i >= 0; i--) {
+    const n = nodes[i];
+    const dx = cx - n.x, dy = cy - n.y;
+    if (dx*dx + dy*dy < (n.radius+4) * (n.radius+4)) return n;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const node = getNodeAt(mx, my);
+  canvas.style.cursor = node ? 'pointer' : 'grab';
+
+  if (dragging) {
+    dragging.x += (e.movementX || 0) / camScale;
+    dragging.y += (e.movementY || 0) / camScale;
+    simulate();
+    draw();
+    return;
+  }
+  if (node !== hoveredNode) {
+    hoveredNode = node;
+    draw();
+    showTooltip(node, e.clientX, e.clientY);
+  } else if (node) {
+    updateTooltipPos(e.clientX, e.clientY);
+  }
+});
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
+  if (node) {
+    dragging = node;
+    selectedNode = node;
+    updateStats();
+    draw();
+  } else {
+    selectedNode = null;
+    updateStats();
+    draw();
+  }
+});
+
+canvas.addEventListener('mouseup', () => { dragging = null; });
+canvas.addEventListener('mouseleave', () => { dragging = null; hoveredNode = null; hideTooltip(); });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  camScale = Math.max(0.3, Math.min(4, camScale * factor));
+  draw();
+}, { passive: false });
+
+// Zoom buttons
+document.getElementById('zm-in').onclick = () => { camScale = Math.min(4, camScale*1.2); draw(); };
+document.getElementById('zm-out').onclick = () => { camScale = Math.max(0.3, camScale*0.8); draw(); };
+document.getElementById('zm-reset').onclick = () => { camScale=1; camX=0; camY=0; draw(); };
+
+// Search
+document.getElementById('search-input').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  draw();
+});
+
+// Tooltip
+const tooltip = document.getElementById('tooltip');
+function showTooltip(node, mx, my) {
+  if (!node || (!node.isSkill && !node.isCat && !node.isRoot)) { hideTooltip(); return; }
+  let html = '';
+  if (node.isRoot) {
+    html = `<div class="tt-name">🤖 AI Agent</div><div class="tt-cat">Skill Tree Root</div><div class="tt-desc">AI Agent 需要具備各種技能來完成自動化任務。點擊下方分類探索！</div>`;
+  } else if (node.isCat) {
+    const skills = skillNodes.filter(s => s.catId === node.catId);
+    html = `<div class="tt-name" style="color:${node.color}">${node.label}</div><div class="tt-desc">${skills.length} 個工具/技能<br><span style="font-size:11px;color:#888">點擊技能查看詳情</span></div>`;
+  } else {
+    html = `<div class="tt-name" style="color:${node.color}">${node.label}</div><div class="tt-cat">${node.catName}</div><div class="tt-desc">${node.desc}</div>`;
+  }
+  tooltip.innerHTML = html;
+  tooltip.classList.add('visible');
+  updateTooltipPos(mx, my);
+}
+function updateTooltipPos(mx, my) {
+  let tx = mx + 16, ty = my + 16;
+  if (tx + 320 > W) tx = mx - 330;
+  if (ty + 100 > H) ty = my - 100;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top = ty + 'px';
+}
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+// Stats
+function updateStats() {
+  const total = skillNodes.length;
+  const cats = catNodes.length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-cats').textContent = cats;
+  document.getElementById('s-selected').textContent = selectedNode ? (selectedNode.isCat ? selectedNode.label : selectedNode.label) : '—';
+}
+
+// Legend
+const legendEl = document.getElementById('legend');
+for (const [catId, catInfo] of Object.entries(CATEGORIES)) {
+  const count = skillNodes.filter(s => s.catId === catId).length;
+  const div = document.createElement('div');
+  div.className = 'legend-item';
+  div.innerHTML = `<span class="legend-dot" style="background:${catInfo.color}"></span><span>${catInfo.label}</span><span class="legend-count">${count}</span>`;
+  div.onclick = () => {
+    searchQuery = catId.toLowerCase();
+    document.getElementById('search-input').value = catInfo.label.replace(/🎨🔧🎮🐙💻🤖🔬📊📱📈🏠🐕📝📧🧘/g, '');
+    draw();
+  };
+  legendEl.appendChild(div);
+}
+
+// ==================== INIT ====================
+simulate();
+draw();
+updateStats();
+
+// Auto-center animation
+let initAnim = 0;
+function initAnimLoop() {
+  if (initAnim < 60) {
+    camX *= 0.95;
+    camY *= 0.95;
+    draw();
+    initAnim++;
+    requestAnimationFrame(initAnimLoop);
+  }
+}
+setTimeout(initAnimLoop, 100);
+
+console.log(`✅ AI Agent Skill Tree loaded: ${nodes.length} nodes, ${edges.length} edges, ${SKILLS.length} skills, ${Object.keys(CATEGORIES).length} categories`);
+</script>
+</body>
+</html>
