@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🧠 AI Agent Skill Tree Explorer 2026</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a1a;--surface:#12122a;--card:#1a1a3e;--accent:#6c5ce7;--accent2:#a29bfe;--accent3:#00cec9;--accent4:#fd79a8;--text:#e8e8f0;--text-dim:#8888aa;--glow:rgba(108,92,231,0.4)}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+#app{display:flex;flex-direction:column;height:100vh;width:100vw}
+#header{padding:12px 20px;background:linear-gradient(135deg,var(--surface),var(--card));border-bottom:1px solid rgba(108,92,231,0.2);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
+#header h1{font-size:1.2em;background:linear-gradient(90deg,var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;gap:8px}
+#header .badge{font-size:.65em;background:var(--accent);padding:2px 8px;border-radius:10px;color:#fff;-webkit-text-fill-color:#fff}
+#header .hint{font-size:.75em;color:var(--text-dim)}
+#stats-bar{display:flex;gap:12px;padding:10px 20px;background:var(--surface);border-bottom:1px solid rgba(108,92,231,0.15);flex-shrink:0;overflow-x:auto;flex-wrap:wrap}
+.stat-card{background:var(--card);border:1px solid rgba(108,92,231,0.2);border-radius:10px;padding:8px 14px;min-width:100px;text-align:center;flex-shrink:0;transition:transform .2s,box-shadow .2s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 4px 15px var(--glow)}
+.stat-card .num{font-size:1.4em;font-weight:700;background:linear-gradient(90deg,var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-card .label{font-size:.65em;color:var(--text-dim);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+#canvas-wrap{flex:1;position:relative;overflow:hidden;cursor:grab}
+#canvas-wrap:active{cursor:grabbing}
+#canvas{display:block;width:100%;height:100%}
+#tooltip{position:fixed;pointer-events:none;background:rgba(18,18,42,0.95);border:1px solid var(--accent);border-radius:12px;padding:14px 18px;max-width:320px;opacity:0;transition:opacity .15s;z-index:100;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+#tooltip.show{opacity:1}
+#tooltip h3{font-size:.95em;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+#tooltip .cat{font-size:.7em;padding:2px 8px;border-radius:6px;display:inline-block;margin-bottom:6px}
+#tooltip p{font-size:.8em;color:var(--text-dim);line-height:1.5}
+#tooltip .meta{font-size:.7em;color:var(--accent3);margin-top:6px}
+#detail-panel{position:fixed;right:-400px;top:0;bottom:0;width:380px;background:var(--surface);border-left:1px solid rgba(108,92,231,0.3);padding:20px;overflow-y:auto;z-index:50;transition:right .3s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 30px rgba(0,0,0,0.4)}
+#detail-panel.open{right:0}
+#detail-panel .close{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-dim);font-size:1.5em;cursor:pointer;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:background .2s}
+#detail-panel .close:hover{background:rgba(255,255,255,0.1)}
+#detail-panel h2{font-size:1.1em;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+#detail-panel .desc{font-size:.85em;color:var(--text-dim);line-height:1.6;margin-bottom:16px}
+#detail-panel .section{margin-bottom:16px}
+#detail-panel .section h4{font-size:.75em;text-transform:uppercase;color:var(--accent2);margin-bottom:8px;letter-spacing:1px}
+#detail-panel .tag{display:inline-block;padding:4px 10px;border-radius:6px;font-size:.75em;margin:2px;background:rgba(108,92,231,0.2);color:var(--accent2)}
+#detail-panel .stars{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--card);border-radius:8px;margin-top:8px}
+#detail-panel .stars .num{font-size:1.3em;font-weight:700;color:#ffd700}
+#detail-panel .stars .label{font-size:.7em;color:var(--text-dim)}
+#legend{position:fixed;bottom:16px;left:16px;background:rgba(18,18,42,0.9);backdrop-filter:blur(10px);border:1px solid rgba(108,92,231,0.2);border-radius:10px;padding:10px 14px;z-index:20;font-size:.7em}
+#legend h4{font-size:.7em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;letter-spacing:.5px}
+.legend-item{display:flex;align-items:center;gap:6px;margin:3px 0;color:var(--text)}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#zoom-controls{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:4px;z-index:20}
+#zoom-controls button{width:36px;height:36px;border:1px solid rgba(108,92,231,0.3);background:rgba(18,18,42,0.9);color:var(--text);border-radius:8px;font-size:1.2em;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s,transform .1s}
+#zoom-controls button:hover{background:var(--accent);border-color:var(--accent)}
+#zoom-controls button:active{transform:scale(0.9)}
+#filter-bar{position:fixed;top:50%;left:16px;transform:translateY(-50%);display:flex;flex-direction:column;gap:4px;z-index:20}
+.filter-btn{width:36px;height:36px;border:1px solid rgba(108,92,231,0.2);background:rgba(18,18,42,0.9);border-radius:8px;cursor:pointer;font-size:.8em;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(10px)}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);box-shadow:0 0 10px var(--glow);transform:scale(1.1)}
+#filter-btn.active{background:var(--accent)}
+@media(max-width:768px){
+  #header h1{font-size:1em}
+  #stats-bar{padding:8px 12px;gap:8px}
+  .stat-card{min-width:80px;padding:6px 10px}
+  .stat-card .num{font-size:1.1em}
+  #legend{bottom:8px;left:8px;padding:6px 10px;font-size:.6em}
+  #filter-bar{display:none}
+  #detail-panel{width:100%;right:-100%}
+}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+#loading{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:16px;transition:opacity .5s}
+#loading.hide{opacity:0;pointer-events:none}
+.spinner{width:40px;height:40px;border:3px solid rgba(108,92,231,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{color:var(--text-dim);font-size:.85em}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><p>🧠 Mapping the AI Agent Universe...</p></div>
+<div id="app">
+  <div id="header">
+    <h1>🧠 AI Agent Skill Tree Explorer <span class="badge">2026</span></h1>
+    <span class="hint">🖱️ Scroll to zoom · Drag to pan · Click nodes to explore</span>
+  </div>
+  <div id="stats-bar">
+    <div class="stat-card"><div class="num" id="stat-nodes">0</div><div class="label">Tools</div></div>
+    <div class="stat-card"><div class="num" id="stat-connections">0</div><div class="label">Connections</div></div>
+    <div class="stat-card"><div class="num" id="stat-categories">0</div><div class="label">Categories</div></div>
+    <div class="stat-card"><div class="num" id="stat-stars">0</div><div class="label">Total Stars</div></div>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<div id="tooltip">
+  <h3></h3>
+  <span class="cat"></span>
+  <p></p>
+  <div class="meta"></div>
+</div>
+
+<div id="detail-panel">
+  <button class="close" onclick="closeDetail()">✕</button>
+  <div id="detail-content"></div>
+</div>
+
+<div id="legend">
+  <h4>Categories</h4>
+</div>
+
+<div id="zoom-controls">
+  <button onclick="zoomIn()" title="Zoom in">+</button>
+  <button onclick="zoomOut()" title="Zoom out">−</button>
+  <button onclick="resetView()" title="Reset view">⌂</button>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────
+const CATEGORIES = {
+  framework:   { label: 'Framework',    color: '#6c5ce7', bg: 'rgba(108,92,231,0.2)' },
+  tool:        { label: 'Tool',         color: '#00cec9', bg: 'rgba(0,206,201,0.2)' },
+  memory:      { label: 'Memory',       color: '#fd79a8', bg: 'rgba(253,121,168,0.2)' },
+  multimodal:  { label: 'Multimodal',   color: '#fdcb6e', bg: 'rgba(253,203,110,0.2)' },
+  infra:       { label: 'Infrastructure',color: '#a29bfe',bg: 'rgba(162,155,254,0.2)' },
+  research:    { label: 'Research',     color: '#55efc4', bg: 'rgba(85,239,196,0.2)' },
+  skill:       { label: 'Skill',        color: '#fab1a0', bg: 'rgba(250,177,160,0.2)' },
+  model:       { label: 'Model',        color: '#74b9ff', bg: 'rgba(116,185,255,0.2)' }
+};
+
+const NODES = [
+  // Central hub
+  { id:'agent', label:'🤖 AI Agents', desc:'The grand unified theory of autonomous AI systems', category:'model', stars:99999, size:38, connections:[] },
+  
+  // Frameworks (GitHub Trending)
+  { id:'ui-tars', label:'🖥️ UI-TARS', desc:'Open-source multimodal AI agent stack by ByteDance. Connects cutting-edge AI models and agent infrastructure.', category:'framework', stars:31137, size:22, connections:['agent','multimodal','memory','tool'] },
+  { id:'rowboat', label:'🚣 Rowboat', desc:'Open-source AI coworker with persistent memory. Your second brain for coding.', category:'framework', stars:13583, size:20, connections:['agent','memory','infra'] },
+  { id:'hello-agents', label:'📚 Hello Agents', desc:'《从零开始构建智能体》— Complete guide to building AI agents from scratch. 45K+ stars!', category:'framework', stars:45451, size:24, connections:['agent','research','skill'] },
+  { id:'easy-vibe', label:'💻 Easy Vibe', desc:'Vibe coding 2026 — Your first modern programming course for beginners. Learn by building.', category:'framework', stars:8257, size:18, connections:['agent','skill'] },
+  { id:'devtools-mcp', label:'🔧 Chrome DevTools MCP', desc:'Chrome DevTools for coding agents. Programmatic browser automation via MCP protocol.', category:'tool', stars:38657, size:20, connections:['agent','infra','tool'] },
+  { id:'agent-memory', label:'🧠 Agent Memory', desc:'#1 Persistent memory for AI coding agents based on real-world benchmarks.', category:'memory', stars:3136, size:18, connections:['agent','memory'] },
+  { id:'financial-services', label:'💰 Financial Services', desc:'Anthropic\'s AI-powered financial services toolkit. Agent-based financial analysis.', category:'framework', stars:16753, size:20, connections:['agent','skill'] },
+  
+  // Memory systems
+  { id:'vector-db', label:'📊 Vector DB', desc:'Pinecone, Weaviate, Chroma — embedding stores for agent knowledge.', category:'memory', stars:50000, size:16, connections:['agent','memory','infra'] },
+  { id:'sqlite-vec', label:'🗄️ SQLite-Vec', desc:'Vector search built directly into SQLite. Simple, fast, embedded.', category:'memory', stars:12000, size:15, connections:['memory','infra'] },
+  { id:'rag', label:'🔗 RAG Pipeline', desc:'Retrieval-Augmented Generation — giving agents access to external knowledge.', category:'tool', stars:25000, size:17, connections:['agent','memory','model'] },
+  
+  // Multimodal
+  { id:'supersplat', label:'🎨 Supersplat', desc:'3D Gaussian Splat Editor by PlayCanvas. Visualize 3D scenes in the browser.', category:'multimodal', stars:6034, size:17, connections:['multimodal','infra'] },
+  { id:'gpt-4o', label:'👁️ GPT-4o Vision', desc:'OpenAI\'s multimodal model — sees, hears, speaks, and thinks in real-time.', category:'model', stars:999999, size:18, connections:['agent','multimodal','model'] },
+  { id:'whisper', label:'🎙️ Whisper', desc:'OpenAI\'s speech-to-text model. Transcribe audio with remarkable accuracy.', category:'model', stars:55000, size:15, connections:['multimodal','model'] },
+  { id:'suno', label:'🎵 Suno AI', desc:'AI music generation from text prompts. Create full songs in seconds.', category:'multimodal', stars:18000, size:15, connections:['multimodal','skill'] },
+  
+  // Infrastructure
+  { id:'mcp', label:'🔌 MCP Protocol', desc:'Model Context Protocol — the universal interface between AI models and tools.', category:'infra', stars:20000, size:16, connections:['agent','infra','tool'] },
+  { id:'vllm', label:'⚡ vLLM', desc:'High-throughput LLM serving engine. 24x faster than baseline.', category:'infra', stars:30000, size:16, connections:['infra','model'] },
+  { id:'unsloth', label:'🚀 Unsloth', desc:'2-5x faster LoRA/QLoRA fine-tuning with less VRAM. Train your own agents.', category:'infra', stars:25000, size:15, connections:['infra','model','skill'] },
+  { id:'axolotl', label:'📐 Axolotl', desc:'YAML-based LLM fine-tuning framework. LoRA, DPO, GRPO training made simple.', category:'infra', stars:15000, size:14, connections:['infra','model'] },
+  { id:'dspy', label:'✍️ DSPy', desc:'Declarative LM programming — optimize prompts and pipelines like code.', category:'infra', stars:20000, size:16, connections:['infra','skill'] },
+  
+  // Research papers/topics
+  { id:'doc-corruption', label:'📄 Document Corruption', desc:'HN trending: LLMs silently corrupt your documents when you delegate tasks to them.', category:'research', stars:460, size:14, connections:['agent','skill'] },
+  { id:'mythical-man-month', label:'👥 Mythical Man Month', desc:'HN classic: Adding manpower to a late software project makes it later. Still relevant for AI teams.', category:'research', stars:2220, size:14, connections:['agent','skill'] },
+  { id:'webRTC-problem', label:'🌐 WebRTC Problem', desc:'OpenAI\'s WebRTC bottleneck — why scaling real-time AI is harder than expected.', category:'research', stars:3740, size:14, connections:['infra','research'] },
+  
+  // Skills / Tools
+  { id:'trl', label:'🎯 TRL', desc:'Transformer Reinforcement Learning — DPO, PPO, GRPO for fine-tuning.', category:'skill', stars:18000, size:14, connections:['skill','infra'] },
+  { id:'outlines', label:'📋 Outlines', desc:'Structured LLM output generation — JSON, regex, Pydantic enforced.', category:'skill', stars:12000, size:14, connections:['skill','tool'] },
+  { id:'nano-pdf', label:'📕 Nano PDF', desc:'Edit PDF text/typos/titles via AI prompts. Natural language PDF manipulation.', category:'skill', stars:2000, size:12, connections:['skill','tool'] },
+  { id:'manim', label:'🎬 Manim CE', desc:'Math animation engine (3Blue1Brown). Create stunning educational videos.', category:'skill', stars:28000, size:15, connections:['skill','multimodal'] },
+  { id:'obsidian', label:'📓 Obsidian', desc:'Personal knowledge base with graph view. Perfect for agent memory storage.', category:'skill', stars:75000, size:14, connections:['skill','memory'] },
+  
+  // Models
+  { id:'claude', label:'🧠 Claude', desc:'Anthropic\'s Claude — the most reliable reasoning model for agent tasks.', category:'model', stars:999999, size:18, connections:['agent','model'] },
+  { id:'gemini', label:'⭐ Gemini', desc:'Google\'s multimodal model — native image, audio, and video understanding.', category:'model', stars:999999, size:16, connections:['agent','multimodal','model'] },
+  { id:'llama', label:'🦙 Llama', desc:'Meta\'s open-weight LLM series. Run locally, fine-tune, deploy anywhere.', category:'model', stars:999999, size:17, connections:['model','infra'] },
+];
+
+const EDGES = [
+  // Explicit connections
+  ['agent','ui-tars'], ['agent','rowboat'], ['agent','hello-agents'], ['agent','easy-vibe'],
+  ['agent','devtools-mcp'], ['agent','agent-memory'], ['agent','financial-services'],
+  ['agent','vector-db'], ['agent','rag'], ['agent','mcp'], ['agent','dspy'], ['agent','doc-corruption'],
+  ['ui-tars','multimodal'], ['ui-tars','memory'], ['ui-tars','tool'],
+  ['rowboat','memory'], ['rowboat','infra'],
+  ['hello-agents','research'], ['hello-agents','skill'],
+  ['devtools-mcp','infra'], ['devtools-mcp','tool'],
+  ['financial-services','skill'],
+  ['vector-db','memory'], ['vector-db','infra'],
+  ['rag','model'], ['rag','memory'],
+  ['supersplat','infra'],
+  ['gpt-4o','multimodal'], ['gpt-4o','model'],
+  ['whisper','multimodal'],
+  ['suno','skill'],
+  ['mcp','tool'],
+  ['vllm','model'],
+  ['unsloth','model'], ['unsloth','skill'],
+  ['axolotl','model'],
+  ['dspy','skill'],
+  ['doc-corruption','skill'],
+  ['mythical-man-month','skill'],
+  ['webRTC-problem','research'],
+  ['trl','infra'],
+  ['outlines','tool'],
+  ['nano-pdf','tool'],
+  ['manim','multimodal'],
+  ['obsidian','memory'],
+  ['claude','model'],
+  ['gemini','multimodal'],
+  ['llama','infra'],
+  // Extra cross-connections for richness
+  ['mcp','ui-tars'], ['unsloth','vllm'], ['dspy','outlines'],
+  ['obsidian','hello-agents'], ['gemini','gpt-4o'], ['llama','claude'],
+  ['doc-corruption','rag'], ['mythical-man-month','rowboat'],
+  ['whisper','gemini'], ['suno','manim'],
+];
+
+// ─── STATE ───────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+let nodes = [];
+let edges = [];
+let hoveredNode = null;
+let selectedNode = null;
+let dragNode = null;
+let pan = { x: 0, y: 0 };
+let zoom = 1;
+let isDragging = false;
+let lastMouse = { x: 0, y: 0 };
+let touchStartDist = 0;
+let animFrame;
+let time = 0;
+let activeFilter = null;
+let nodePositions = {};
+
+// ─── INIT ────────────────────────────────────────────────
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = canvas.parentElement.clientWidth;
+  H = canvas.parentElement.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function initNodes() {
+  const cx = W / 2, cy = H / 2;
+  nodes = NODES.map((n, i) => {
+    const angle = (i / NODES.length) * Math.PI * 2;
+    const radius = 200 + Math.random() * 200;
+    return {
+      ...n,
+      x: cx + Math.cos(angle) * radius,
+      y: cy + Math.sin(angle) * radius,
+      vx: 0, vy: 0,
+      radius: n.size,
+      glowPhase: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.5 + Math.random() * 1.5
+    };
+  });
+
+  edges = EDGES.map(([source, target]) => ({
+    source, target,
+    strength: 1
+  }));
+
+  // Build position lookup
+  nodes.forEach(n => { nodePositions[n.id] = n; });
+
+  // Update stats
+  document.getElementById('stat-nodes').textContent = nodes.length;
+  document.getElementById('stat-connections').textContent = edges.length;
+  document.getElementById('stat-categories').textContent = Object.keys(CATEGORIES).length;
+  document.getElementById('stat-stars').textContent = formatStars(nodes.reduce((s, n) => s + n.stars, 0));
+
+  // Build legend
+  const legend = document.getElementById('legend');
+  Object.entries(CATEGORIES).forEach(([key, val]) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${val.color}"></span>${val.label}`;
+    item.style.cursor = 'pointer';
+    item.addEventListener('click', () => filterByCategory(key));
+    legend.appendChild(item);
+  });
+
+  // Center view
+  const centerNode = nodes.find(n => n.id === 'agent');
+  if (centerNode) {
+    pan.x = W / 2 - centerNode.x;
+    pan.y = H / 2 - centerNode.y;
+  }
+}
+
+function formatStars(s) {
+  if (s >= 1000000) return (s/1000000).toFixed(1) + 'M';
+  if (s >= 1000) return (s/1000).toFixed(1) + 'K';
+  return s.toString();
+}
+
+// ─── FORCE LAYOUT ────────────────────────────────────────
+function applyForces() {
+  const alpha = 0.3;
+  const cx = W / 2, cy = H / 2;
+
+  // Repulsion between all nodes
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      let force = 8000 / (dist * dist);
+      let fx = (dx / dist) * force;
+      let fy = (dy / dist) * force;
+      a.vx -= fx; a.vy -= fy;
+      b.vx += fx; b.vy += fy;
+    }
+  }
+
+  // Attraction along edges
+  edges.forEach(e => {
+    const a = nodePositions[e.source], b = nodePositions[e.target];
+    if (!a || !b) return;
+    let dx = b.x - a.x, dy = b.y - a.y;
+    let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    let idealDist = 150;
+    let force = (dist - idealDist) * 0.005;
+    let fx = (dx / dist) * force;
+    let fy = (dy / dist) * force;
+    a.vx += fx; a.vy += fy;
+    b.vx -= fx; b.vy -= fy;
+  });
+
+  // Center gravity (gentle)
+  nodes.forEach(n => {
+    n.vx += (cx - n.x) * 0.0003;
+    n.vy += (cy - n.y) * 0.0003;
+  });
+
+  // Apply velocity with damping
+  nodes.forEach(n => {
+    if (n === dragNode) return;
+    n.vx *= 0.85;
+    n.vy *= 0.85;
+    n.x += n.vx * alpha;
+    n.y += n.vy * alpha;
+  });
+}
+
+// ─── RENDERING ───────────────────────────────────────────
+function render() {
+  time += 0.016;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background gradient
+  const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.7);
+  bg.addColorStop(0, '#0f0f2a');
+  bg.addColorStop(1, '#050510');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(108,92,231,0.04)';
+  ctx.lineWidth = 1;
+  const gridSize = 60;
+  for (let x = 0; x < W; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.translate(pan.x, pan.y);
+  ctx.scale(zoom, zoom);
+
+  // Edges
+  edges.forEach(e => {
+    const a = nodePositions[e.source], b = nodePositions[e.target];
+    if (!a || !b) return;
+    const isHighlighted = hoveredNode && (hoveredNode.id === e.source || hoveredNode.id === e.target);
+    const alpha = isHighlighted ? 0.6 : 0.1;
+    ctx.strokeStyle = `rgba(108,92,231,${alpha})`;
+    ctx.lineWidth = isHighlighted ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+
+    // Animated dot on highlighted edges
+    if (isHighlighted) {
+      const t = (Math.sin(time * 2) + 1) / 2;
+      const px = a.x + (b.x - a.x) * t;
+      const py = a.y + (b.y - a.y) * t;
+      ctx.fillStyle = 'rgba(108,92,231,0.8)';
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    const cat = CATEGORIES[n.category];
+    const isHovered = hoveredNode === n;
+    const isSelected = selectedNode === n;
+    const isConnected = hoveredNode && edges.some(e =>
+      (e.source === hoveredNode.id && e.target === n.id) ||
+      (e.target === hoveredNode.id && e.source === n.id)
+    );
+    const isDimmed = hoveredNode && !isHovered && !isConnected;
+    const pulse = Math.sin(time * n.pulseSpeed + n.glowPhase) * 0.3 + 0.7;
+
+    if (isDimmed) {
+      ctx.globalAlpha = 0.15;
+    }
+
+    // Glow
+    if (isHovered || isSelected) {
+      const glow = ctx.createRadialGradient(n.x, n.y, n.radius * 0.5, n.x, n.y, n.radius * 3);
+      glow.addColorStop(0, cat.color + '60');
+      glow.addColorStop(1, cat.color + '00');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Outer ring
+    ctx.strokeStyle = cat.color;
+    ctx.lineWidth = isHovered ? 3 : isSelected ? 3 : 2;
+    ctx.globalAlpha = (isDimmed ? 0.15 : 0.8) * pulse;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.radius + 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Main circle
+    const grad = ctx.createRadialGradient(n.x - n.radius * 0.3, n.y - n.radius * 0.3, 0, n.x, n.y, n.radius);
+    grad.addColorStop(0, cat.color + 'cc');
+    grad.addColorStop(1, cat.color + '66');
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = isDimmed ? 0.15 : 1;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.arc(n.x - n.radius * 0.2, n.y - n.radius * 0.2, n.radius * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Emoji label
+    ctx.globalAlpha = isDimmed ? 0.1 : 1;
+    ctx.font = `${n.radius * 0.7}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const emoji = n.label.match(/[\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}]/u)?.[0] || '●';
+    ctx.fillText(emoji, n.x, n.y - 2);
+
+    // Label below
+    ctx.globalAlpha = isDimmed ? 0.05 : 0.9;
+    ctx.fillStyle = '#fff';
+    ctx.font = `${isHovered ? 'bold ' : ''}${Math.max(9, n.radius * 0.35)}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    const text = n.label.replace(/^[^\s]+\s/, '');
+    ctx.fillText(text, n.x, n.y + n.radius + 8);
+
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.restore();
+}
+
+// ─── ANIMATION LOOP ──────────────────────────────────────
+function loop() {
+  applyForces();
+  render();
+  animFrame = requestAnimationFrame(loop);
+}
+
+// ─── INTERACTION ─────────────────────────────────────────
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - pan.x) / zoom,
+    y: (sy - pan.y) / zoom
+  };
+}
+
+function findNodeAt(sx, sy) {
+  const w = screenToWorld(sx, sy);
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const dx = w.x - n.x, dy = w.y - n.y;
+    if (dx * dx + dy * dy < (n.radius + 10) * (n.radius + 10)) return n;
+  }
+  return null;
+}
+
+// Mouse events
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (dragNode) {
+    const w = screenToWorld(mx, my);
+    dragNode.x = w.x;
+    dragNode.y = w.y;
+    dragNode.vx = 0;
+    dragNode.vy = 0;
+    return;
+  }
+
+  if (isDragging) {
+    pan.x += e.clientX - lastMouse.x;
+    pan.y += e.clientY - lastMouse.y;
+    lastMouse = { x: e.clientX, y: e.clientY };
+    return;
+  }
+
+  const node = findNodeAt(mx, my);
+  if (node !== hoveredNode) {
+    hoveredNode = node;
+    canvas.style.cursor = node ? 'pointer' : 'grab';
+    if (node) showTooltip(e.clientX, e.clientY, node);
+    else hideTooltip();
+  } else if (node) {
+    moveTooltip(e.clientX, e.clientY);
+  }
+});
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const node = findNodeAt(mx, my);
+
+  if (node) {
+    dragNode = node;
+    canvas.style.cursor = 'grabbing';
+  } else {
+    isDragging = true;
+    lastMouse = { x: e.clientX, y: e.clientY };
+    canvas.style.cursor = 'grabbing';
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (dragNode) {
+    const wasDrag = Math.abs(e.clientX - lastMouse.x) > 3;
+    if (!wasDrag) {
+      selectNode(dragNode);
+    }
+    dragNode = null;
+    canvas.style.cursor = 'pointer';
+  } else if (isDragging) {
+    const wasDrag = Math.abs(e.clientX - lastMouse.x) > 3 || Math.abs(e.clientY - lastMouse.y) > 3;
+    if (!wasDrag) {
+      // Click on empty space
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const node = findNodeAt(mx, my);
+      if (node) selectNode(node);
+    }
+  }
+  isDragging = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (dragNode) { dragNode = null; isDragging = false; }
+  hoveredNode = null;
+  hideTooltip();
+  canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const newZoom = Math.max(0.2, Math.min(5, zoom * delta));
+  
+  // Zoom towards mouse position
+  pan.x = mx - (mx - pan.x) * (newZoom / zoom);
+  pan.y = my - (my - pan.y) * (newZoom / zoom);
+  zoom = newZoom;
+}, { passive: false });
+
+// Touch events
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const mx = t.clientX - rect.left;
+    const my = t.clientY - rect.top;
+    const node = findNodeAt(mx, my);
+    if (node) {
+      dragNode = node;
+    } else {
+      isDragging = true;
+      lastMouse = { x: t.clientX, y: t.clientY };
+    }
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchStartDist = Math.sqrt(dx * dx + dy * dy);
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    if (dragNode) {
+      const rect = canvas.getBoundingClientRect();
+      const w = screenToWorld(t.clientX - rect.left, t.clientY - rect.top);
+      dragNode.x = w.x;
+      dragNode.y = w.y;
+    } else if (isDragging) {
+      pan.x += t.clientX - lastMouse.x;
+      pan.y += t.clientY - lastMouse.y;
+      lastMouse = { x: t.clientX, y: t.clientY };
+    }
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const delta = dist / touchStartDist;
+    zoom = Math.max(0.2, Math.min(5, zoom * delta));
+    touchStartDist = dist;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (dragNode) {
+    selectNode(dragNode);
+    dragNode = null;
+  }
+  isDragging = false;
+});
+
+// ─── TOOLTIP ─────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTooltip(x, y, node) {
+  const cat = CATEGORIES[node.category];
+  tooltip.querySelector('h3').innerHTML = `${node.emoji || ''} ${node.label.replace(/^[^\s]+\s/, '')}`;
+  tooltip.querySelector('.cat').textContent = cat.label;
+  tooltip.querySelector('.cat').style.background = cat.bg;
+  tooltip.querySelector('.cat').style.color = cat.color;
+  tooltip.querySelector('p').textContent = node.desc;
+  tooltip.querySelector('.meta').textContent = `⭐ ${formatStars(node.stars)} · ${node.connections.length} connections`;
+  tooltip.style.left = (x + 16) + 'px';
+  tooltip.style.top = (y - 10) + 'px';
+  tooltip.classList.add('show');
+}
+function moveTooltip(x, y) {
+  tooltip.style.left = (x + 16) + 'px';
+  tooltip.style.top = (y - 10) + 'px';
+}
+function hideTooltip() {
+  tooltip.classList.remove('show');
+}
+
+// ─── DETAIL PANEL ────────────────────────────────────────
+function selectNode(node) {
+  selectedNode = node;
+  const panel = document.getElementById('detail-panel');
+  const cat = CATEGORIES[node.category];
+  const connNodes = node.connections.map(id => nodePositions[id]).filter(Boolean);
+  const connLabels = connNodes.map(n => `<span class="tag" style="border:1px solid ${CATEGORIES[n.category].color};color:${CATEGORIES[n.category].color}">${n.label}</span>`).join('');
+
+  document.getElementById('detail-content').innerHTML = `
+    <h2>${node.emoji || '●'} ${node.label.replace(/^[^\s]+\s/, '')}</h2>
+    <span class="cat" style="background:${cat.bg};color:${cat.color};padding:3px 10px;border-radius:6px;font-size:.75em">${cat.label}</span>
+    <div class="desc">${node.desc}</div>
+    <div class="section">
+      <h4>📊 Stats</h4>
+      <div class="stars">
+        <span class="num">⭐ ${formatStars(node.stars)}</span>
+        <span class="label">stars · ${node.connections.length} connections</span>
+      </div>
+    </div>
+    <div class="section">
+      <h4>🔗 Connections</h4>
+      ${connLabels}
+    </div>
+    <div class="section">
+      <h4>📈 Trending</h4>
+      <p style="font-size:.8em;color:var(--text-dim)">
+        ${node.stars > 30000 ? '🔥 Extremely popular — top tier project' : 
+          node.stars > 10000 ? '⬆️ Very popular — growing rapidly' :
+          node.stars > 1000 ? '📈 Popular — solid community' :
+          '💡 Niche — specialized tool'}
+      </p>
+    </div>
+  `;
+  panel.classList.add('open');
+}
+
+function closeDetail() {
+  selectedNode = null;
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+// ─── ZOOM CONTROLS ───────────────────────────────────────
+function zoomIn() {
+  const newZoom = Math.min(5, zoom * 1.3);
+  pan.x = W/2 - (W/2 - pan.x) * (newZoom / zoom);
+  pan.y = H/2 - (H/2 - pan.y) * (newZoom / zoom);
+  zoom = newZoom;
+}
+
+function zoomOut() {
+  const newZoom = Math.max(0.2, zoom * 0.7);
+  pan.x = W/2 - (W/2 - pan.x) * (newZoom / zoom);
+  pan.y = H/2 - (H/2 - pan.y) * (newZoom / zoom);
+  zoom = newZoom;
+}
+
+function resetView() {
+  const centerNode = nodes.find(n => n.id === 'agent');
+  if (centerNode) {
+    pan.x = W / 2 - centerNode.x;
+    pan.y = H / 2 - centerNode.y;
+  }
+  zoom = 1;
+}
+
+// ─── FILTER ──────────────────────────────────────────────
+function filterByCategory(catKey) {
+  if (activeFilter === catKey) {
+    activeFilter = null;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  } else {
+    activeFilter = catKey;
+  }
+}
+
+// ─── START ───────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  resize();
+  if (nodes.length > 0) {
+    // Reposition center
+    const centerNode = nodes.find(n => n.id === 'agent');
+    if (centerNode) {
+      centerNode.x = W / 2;
+      centerNode.y = H / 2;
+    }
+  }
+});
+
+resize();
+initNodes();
+
+// Hide loading screen
+setTimeout(() => {
+  document.getElementById('loading').classList.add('hide');
+  setTimeout(() => document.getElementById('loading').remove(), 600);
+}, 800);
+
+loop();
+</script>
+</body>
+</html>
